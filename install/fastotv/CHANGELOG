@@ -1,0 +1,38 @@
+1.5.2 / June 21, 2019
+[Alexandr Topilski]
+- Stabilization
+- Rasspbery PI
+- Realtime login password
+- Branding
+- Gzip compress
+- New scripts
+- Channels not showing up in list #42
+- User state
+- Compress messages
+- Service notification
+- JSON RPC
+- Update external libraries
+- Fixed deb package for Ubuntu 18
+- Https recover
+- libpng fix for Linux
+- Search channels
+- Fix fonts for MacOSX
+- Optimize event loop
+- Player mode
+- Playlist view
+- Save dynamic options
+- SDL image linkage
+- Video info
+- EPG basic support
+- MacOSX build
+- Device info
+- Bandwidth estimation
+- Enable/Disable audio/video in channel
+- Seek stream
+- Cuda hwaccel stabilization
+- LIRC support
+- Added hwaccels: Cuvid, Videotoolbox
+- Footer text
+- Config file
+- Added hwaccels: VDPAU, VAAPI, DXVA2
+

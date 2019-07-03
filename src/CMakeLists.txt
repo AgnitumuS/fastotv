@@ -361,13 +361,11 @@ SET(SOURCES_BANDWIDTH_CLIENT
 SET(HEADERS_INNER_CLIENT
   ${CLIENT_SOURCE_DIR}/inner/inner_tcp_server.h
   ${CLIENT_SOURCE_DIR}/inner/inner_tcp_handler.h
-  ${CLIENT_SOURCE_DIR}/commands.h
 )
 
 SET(SOURCES_INNER_CLIENT
   ${CLIENT_SOURCE_DIR}/inner/inner_tcp_server.cpp
   ${CLIENT_SOURCE_DIR}/inner/inner_tcp_handler.cpp
-  ${CLIENT_SOURCE_DIR}/commands.cpp
 )
 
 SET(TV_PLAYER_SOURCES

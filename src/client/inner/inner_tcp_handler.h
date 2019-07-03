@@ -38,11 +38,6 @@ class TcpBandwidthClient;
 }
 namespace inner {
 
-struct StartConfig {
-  common::net::HostAndPort inner_host;
-  commands_info::AuthInfo ainf;
-};
-
 class InnerTcpHandler : public common::libev::IoLoopObserver {
   class InnerSTBClient;
 
@@ -51,7 +46,7 @@ class InnerTcpHandler : public common::libev::IoLoopObserver {
     ping_timeout_server = 30  // sec
   };
 
-  explicit InnerTcpHandler(const StartConfig& config);
+  explicit InnerTcpHandler(const common::net::HostAndPort& server_host, const commands_info::AuthInfo& auth_info);
   ~InnerTcpHandler() override;
 
   void ActivateRequest();                        // should be execute in network thread
@@ -101,7 +96,8 @@ class InnerTcpHandler : public common::libev::IoLoopObserver {
   std::vector<bandwidth::TcpBandwidthClient*> bandwidth_requests_;
   common::libev::timer_id_t ping_server_id_timer_;
 
-  const StartConfig config_;
+  const common::net::HostAndPort server_host_;
+  const commands_info::AuthInfo auth_info_;
 
   bandwidth_t current_bandwidth_;
   std::atomic<protocol::seq_id_t> id_;

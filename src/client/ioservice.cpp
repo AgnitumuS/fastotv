@@ -47,8 +47,8 @@ namespace {
 class PrivateHandler : public inner::InnerTcpHandler {
  public:
   typedef inner::InnerTcpHandler base_class;
-  explicit PrivateHandler(const inner::StartConfig& conf)
-      : base_class(conf)
+  explicit PrivateHandler(const common::net::HostAndPort& server_host, const commands_info::AuthInfo& auth_info)
+      : base_class(server_host, auth_info)
 #ifdef HAVE_LIRC
         ,
         client_(nullptr)
@@ -192,11 +192,7 @@ void IoService::RequesRuntimeChannelInfo(stream_id sid) const {
 }
 
 common::libev::IoLoopObserver* IoService::CreateHandler() {
-  inner::StartConfig conf;
-  conf.inner_host = server_host_;
-  conf.ainf = ainf_;
-  PrivateHandler* handler = new PrivateHandler(conf);
-  return handler;
+  return new PrivateHandler(server_host_, ainf_);
 }
 
 common::libev::IoLoop* IoService::CreateServer(common::libev::IoLoopObserver* handler) {

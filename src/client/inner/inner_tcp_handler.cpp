@@ -32,8 +32,8 @@
 
 #include <fastotv/client.h>  // for Client
 
-#include <fastotv/commands/commands.h>
 #include <fastotv/client/commands_factory.h>
+#include <fastotv/commands/commands.h>
 
 #include <fastotv/commands_info/channels_info.h>  // for ChannelsInfo
 #include <fastotv/commands_info/server_info.h>    // for ServerInfo
@@ -48,12 +48,13 @@ class InnerTcpHandler::InnerSTBClient : public fastotv::ProtocoledClient {
   InnerSTBClient(common::libev::IoLoop* server, const common::net::socket_info& info) : base_class(server, info) {}
 };
 
-InnerTcpHandler::InnerTcpHandler(const StartConfig& config)
+InnerTcpHandler::InnerTcpHandler(const common::net::HostAndPort& server_host, const commands_info::AuthInfo& auth_info)
     : common::libev::IoLoopObserver(),
       inner_connection_(nullptr),
       bandwidth_requests_(),
       ping_server_id_timer_(INVALID_TIMER_ID),
-      config_(config),
+      server_host_(server_host),
+      auth_info_(auth_info),
       current_bandwidth_(0),
       id_() {}
 
@@ -207,7 +208,7 @@ void InnerTcpHandler::ActivateRequest() {
   }
 
   protocol::request_t channels_request;
-  common::Error err_ser = ActiveRequest(NextRequestID(), config_.ainf, &channels_request);
+  common::Error err_ser = ActiveRequest(NextRequestID(), auth_info_, &channels_request);
   if (err_ser) {
     DEBUG_MSG_ERROR(err_ser, common::logging::LOG_LEVEL_ERR);
     return;
@@ -293,12 +294,11 @@ void InnerTcpHandler::Connect(common::libev::IoLoop* server) {
 
   DisConnect(common::make_error("Reconnect"));
 
-  common::net::HostAndPort host = config_.inner_host;
   common::net::socket_info client_info;
-  common::ErrnoError err = common::net::connect(host, common::net::ST_SOCK_STREAM, nullptr, &client_info);
+  common::ErrnoError err = common::net::connect(server_host_, common::net::ST_SOCK_STREAM, nullptr, &client_info);
   if (err) {
     DEBUG_MSG_ERROR(err, common::logging::LOG_LEVEL_ERR);
-    events::ConnectInfo cinf(host);
+    events::ConnectInfo cinf(server_host_);
     auto ex_event =
         common::make_exception_event(new events::ClientConnectedEvent(this, cinf), common::make_error_from_errno(err));
     fApp->PostEvent(ex_event);
@@ -308,7 +308,7 @@ void InnerTcpHandler::Connect(common::libev::IoLoop* server) {
   InnerSTBClient* connection = new InnerSTBClient(server, client_info);
   inner_connection_ = connection;
   server->RegisterClient(connection);
-  events::ConnectInfo cinf(host);
+  events::ConnectInfo cinf(server_host_);
   fApp->PostEvent(new events::ClientConnectedEvent(this, cinf));
 }
 
@@ -389,7 +389,7 @@ common::ErrnoError InnerTcpHandler::HandleRequestServerClientInfo(InnerSTBClient
 
   std::string os = common::MemSPrintf("%s %s(%s)", os_name, os_version, os_arch);
 
-  commands_info::ClientInfo info(config_.ainf.GetLogin(), os, brand, ram_total, ram_free, current_bandwidth_);
+  commands_info::ClientInfo info(auth_info_.GetLogin(), os, brand, ram_total, ram_free, current_bandwidth_);
   protocol::response_t resp;
   common::Error err_ser = SystemInfoResponceSuccsess(req->id, info, &resp);
   if (err_ser) {
@@ -445,13 +445,13 @@ common::ErrnoError InnerTcpHandler::HandleRequestCommand(InnerSTBClient* client,
 
 common::ErrnoError InnerTcpHandler::HandleResponceClientActivate(InnerSTBClient* client, protocol::response_t* resp) {
   if (resp->IsMessage()) {
-    client->SetName(config_.ainf.GetLogin());
-    fApp->PostEvent(new events::ClientAuthorizedEvent(this, config_.ainf));
+    client->SetName(auth_info_.GetLogin());
+    fApp->PostEvent(new events::ClientAuthorizedEvent(this, auth_info_));
     return common::ErrnoError();
   }
 
   common::Error err = common::make_error(resp->error->message);
-  auto ex_event = common::make_exception_event(new events::ClientAuthorizedEvent(this, config_.ainf), err);
+  auto ex_event = common::make_exception_event(new events::ClientAuthorizedEvent(this, auth_info_), err);
   fApp->PostEvent(ex_event);
   return common::ErrnoError();
 }

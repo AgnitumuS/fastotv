@@ -24,29 +24,18 @@
 #include <common/application/application.h>  // for fApp
 #include <common/libev/io_loop.h>            // for IoLoop
 #include <common/net/net.h>                  // for connect
-#include <common/system_info/cpu_info.h>     // for CurrentCpuInfo
-#include <common/system_info/system_info.h>  // for AmountOfAvailable...
 
 #include "client/bandwidth/tcp_bandwidth_client.h"  // for TcpBandwidthClient
 #include "client/events/network_events.h"           // for BandwidtInfo, Con...
 
-#include <fastotv/client.h>  // for Client
-
-#include <fastotv/client/commands_factory.h>
+#include <fastotv/client/client.h>
 #include <fastotv/commands/commands.h>
-
 #include <fastotv/commands_info/channels_info.h>  // for ChannelsInfo
 #include <fastotv/commands_info/server_info.h>    // for ServerInfo
 
 namespace fastotv {
 namespace client {
 namespace inner {
-
-class InnerTcpHandler::InnerSTBClient : public fastotv::ProtocoledClient {
- public:
-  typedef fastotv::ProtocoledClient base_class;
-  InnerSTBClient(common::libev::IoLoop* server, const common::net::socket_info& info) : base_class(server, info) {}
-};
 
 InnerTcpHandler::InnerTcpHandler(const common::net::HostAndPort& server_host, const commands_info::AuthInfo& auth_info)
     : common::libev::IoLoopObserver(),
@@ -55,8 +44,7 @@ InnerTcpHandler::InnerTcpHandler(const common::net::HostAndPort& server_host, co
       ping_server_id_timer_(INVALID_TIMER_ID),
       server_host_(server_host),
       auth_info_(auth_info),
-      current_bandwidth_(0),
-      id_() {}
+      current_bandwidth_(0) {}
 
 InnerTcpHandler::~InnerTcpHandler() {
   CHECK(bandwidth_requests_.empty());
@@ -80,7 +68,7 @@ void InnerTcpHandler::Moved(common::libev::IoLoop* server, common::libev::IoClie
 
 void InnerTcpHandler::Closed(common::libev::IoClient* client) {
   if (client == inner_connection_) {
-    InnerSTBClient* iclient = static_cast<InnerSTBClient*>(client);
+    Client* iclient = static_cast<Client*>(client);
     common::net::socket_info info = iclient->GetInfo();
     common::net::HostAndPort host(info.host(), info.port());
     events::ConnectInfo cinf(host);
@@ -99,12 +87,8 @@ void InnerTcpHandler::Closed(common::libev::IoClient* client) {
   bandwidth_requests_.erase(it);
   common::net::socket_info info = band_client->GetInfo();
   const common::net::HostAndPort host(info.host(), info.port());
-  const BandwidthHostType hs = band_client->GetHostType();
-  const bandwidth_t band = band_client->GetDownloadBytesPerSecond();
-  if (hs == MAIN_SERVER) {
-    current_bandwidth_ = band;
-  }
-  events::BandwidtInfo cinf(host, band, hs);
+  current_bandwidth_ = band_client->GetDownloadBytesPerSecond();
+  events::BandwidtInfo cinf(host, current_bandwidth_);
   events::BandwidthEstimationEvent* band_event = new events::BandwidthEstimationEvent(this, cinf);
   fApp->PostEvent(band_event);
 }
@@ -112,7 +96,7 @@ void InnerTcpHandler::Closed(common::libev::IoClient* client) {
 void InnerTcpHandler::DataReceived(common::libev::IoClient* client) {
   if (client == inner_connection_) {
     std::string buff;
-    InnerSTBClient* iclient = static_cast<InnerSTBClient*>(client);
+    Client* iclient = static_cast<Client*>(client);
     common::ErrnoError err = iclient->ReadCommand(&buff);
     if (err) {
       DEBUG_MSG_ERROR(err, common::logging::LOG_LEVEL_ERR);
@@ -163,27 +147,14 @@ void InnerTcpHandler::PostLooped(common::libev::IoLoop* server) {
 void InnerTcpHandler::TimerEmited(common::libev::IoLoop* server, common::libev::timer_id_t id) {
   UNUSED(server);
   if (id == ping_server_id_timer_ && inner_connection_) {
-    protocol::request_t ping_request;
-    commands_info::ServerPingInfo serv_ping;
-    common::Error err_ser = PingRequest(NextRequestID(), serv_ping, &ping_request);
-    if (err_ser) {
-      DEBUG_MSG_ERROR(err_ser, common::logging::LOG_LEVEL_ERR);
-      return;
-    }
-
-    InnerSTBClient* client = inner_connection_;
-    common::ErrnoError err = client->WriteRequest(ping_request);
+    Client* client = inner_connection_;
+    common::ErrnoError err = client->Ping();
     if (err) {
       DEBUG_MSG_ERROR(err, common::logging::LOG_LEVEL_ERR);
       ignore_result(client->Close());
       delete client;
     }
   }
-}
-
-protocol::sequance_id_t InnerTcpHandler::NextRequestID() {
-  const protocol::seq_id_t next_id = id_++;
-  return common::protocols::json_rpc::MakeRequestID(next_id);
 }
 
 #if LIBEV_CHILD_ENABLE
@@ -207,15 +178,8 @@ void InnerTcpHandler::ActivateRequest() {
     return;
   }
 
-  protocol::request_t channels_request;
-  common::Error err_ser = ActiveRequest(NextRequestID(), auth_info_, &channels_request);
-  if (err_ser) {
-    DEBUG_MSG_ERROR(err_ser, common::logging::LOG_LEVEL_ERR);
-    return;
-  }
-
-  InnerSTBClient* client = inner_connection_;
-  common::ErrnoError err = client->WriteRequest(channels_request);
+  Client* client = inner_connection_;
+  common::ErrnoError err = client->Activate(auth_info_);
   if (err) {
     DEBUG_MSG_ERROR(err, common::logging::LOG_LEVEL_ERR);
     ignore_result(client->Close());
@@ -228,15 +192,8 @@ void InnerTcpHandler::RequestServerInfo() {
     return;
   }
 
-  protocol::request_t channels_request;
-  common::Error err_ser = GetServerInfoRequest(NextRequestID(), &channels_request);
-  if (err_ser) {
-    DEBUG_MSG_ERROR(err_ser, common::logging::LOG_LEVEL_ERR);
-    return;
-  }
-
-  InnerSTBClient* client = inner_connection_;
-  common::ErrnoError err = client->WriteRequest(channels_request);
+  Client* client = inner_connection_;
+  common::ErrnoError err = client->GetServerInfo();
   if (err) {
     DEBUG_MSG_ERROR(err, common::logging::LOG_LEVEL_ERR);
     ignore_result(client->Close());
@@ -249,15 +206,8 @@ void InnerTcpHandler::RequestChannels() {
     return;
   }
 
-  protocol::request_t channels_request;
-  common::Error err_ser = GetChannelsRequest(NextRequestID(), &channels_request);
-  if (err_ser) {
-    DEBUG_MSG_ERROR(err_ser, common::logging::LOG_LEVEL_ERR);
-    return;
-  }
-
-  InnerSTBClient* client = inner_connection_;
-  common::ErrnoError err = client->WriteRequest(channels_request);
+  Client* client = inner_connection_;
+  common::ErrnoError err = client->GetChannels();
   if (err) {
     DEBUG_MSG_ERROR(err, common::logging::LOG_LEVEL_ERR);
     ignore_result(client->Close());
@@ -270,16 +220,8 @@ void InnerTcpHandler::RequesRuntimeChannelInfo(stream_id sid) {
     return;
   }
 
-  protocol::request_t channels_request;
-  commands_info::RuntimeChannelLiteInfo run(sid);
-  common::Error err_ser = GetRuntimeChannelInfoRequest(NextRequestID(), run, &channels_request);
-  if (err_ser) {
-    DEBUG_MSG_ERROR(err_ser, common::logging::LOG_LEVEL_ERR);
-    return;
-  }
-
-  InnerSTBClient* client = inner_connection_;
-  common::ErrnoError err = client->WriteRequest(channels_request);
+  Client* client = inner_connection_;
+  common::ErrnoError err = client->GetRuntimeChannelInfo(sid);
   if (err) {
     DEBUG_MSG_ERROR(err, common::logging::LOG_LEVEL_ERR);
     ignore_result(client->Close());
@@ -305,7 +247,7 @@ void InnerTcpHandler::Connect(common::libev::IoLoop* server) {
     return;
   }
 
-  InnerSTBClient* connection = new InnerSTBClient(server, client_info);
+  Client* connection = new Client(server, client_info);
   inner_connection_ = connection;
   server->RegisterClient(connection);
   events::ConnectInfo cinf(server_host_);
@@ -315,7 +257,7 @@ void InnerTcpHandler::Connect(common::libev::IoLoop* server) {
 void InnerTcpHandler::DisConnect(common::Error err) {
   UNUSED(err);
   if (inner_connection_) {
-    InnerSTBClient* connection = inner_connection_;
+    Client* connection = inner_connection_;
     ignore_result(connection->Close());
     delete connection;
   }
@@ -323,7 +265,6 @@ void InnerTcpHandler::DisConnect(common::Error err) {
 
 common::ErrnoError InnerTcpHandler::CreateAndConnectTcpBandwidthClient(common::libev::IoLoop* server,
                                                                        const common::net::HostAndPort& host,
-                                                                       BandwidthHostType hs,
                                                                        bandwidth::TcpBandwidthClient** out_band) {
   if (!server || !out_band) {
     return common::make_errno_error_inval();
@@ -335,7 +276,7 @@ common::ErrnoError InnerTcpHandler::CreateAndConnectTcpBandwidthClient(common::l
     return err;
   }
 
-  bandwidth::TcpBandwidthClient* connection = new bandwidth::TcpBandwidthClient(server, client_info, hs);
+  bandwidth::TcpBandwidthClient* connection = new bandwidth::TcpBandwidthClient(server, client_info);
   err = connection->StartSession(0, 1000);
   if (err) {
     ignore_result(connection->Close());
@@ -347,7 +288,7 @@ common::ErrnoError InnerTcpHandler::CreateAndConnectTcpBandwidthClient(common::l
   return common::ErrnoError();
 }
 
-common::ErrnoError InnerTcpHandler::HandleRequestServerPing(InnerSTBClient* client, protocol::request_t* req) {
+common::ErrnoError InnerTcpHandler::HandleRequestServerPing(Client* client, protocol::request_t* req) {
   if (req->params) {
     const char* params_ptr = req->params->c_str();
     json_object* jstop = json_tokener_parse(params_ptr);
@@ -363,44 +304,17 @@ common::ErrnoError InnerTcpHandler::HandleRequestServerPing(InnerSTBClient* clie
       return common::make_errno_error(err_str, EAGAIN);
     }
 
-    protocol::response_t resp;
-    commands_info::ClientPingInfo client_ping_info;
-    common::Error err_ser = PingResponseSuccess(req->id, client_ping_info, &resp);
-    if (err_ser) {
-      const std::string err_str = err_ser->GetDescription();
-      return common::make_errno_error(err_str, EAGAIN);
-    }
-    return client->WriteResponce(resp);
+    return client->Pong(req->id);
   }
 
   return common::make_errno_error_inval();
 }
 
-common::ErrnoError InnerTcpHandler::HandleRequestServerClientInfo(InnerSTBClient* client, protocol::request_t* req) {
-  const common::system_info::CpuInfo& c1 = common::system_info::CurrentCpuInfo();
-  std::string brand = c1.GetBrandName();
-
-  int64_t ram_total = common::system_info::AmountOfPhysicalMemory();
-  int64_t ram_free = common::system_info::AmountOfAvailablePhysicalMemory();
-
-  std::string os_name = common::system_info::OperatingSystemName();
-  std::string os_version = common::system_info::OperatingSystemVersion();
-  std::string os_arch = common::system_info::OperatingSystemArchitecture();
-
-  std::string os = common::MemSPrintf("%s %s(%s)", os_name, os_version, os_arch);
-
-  commands_info::ClientInfo info(auth_info_.GetLogin(), os, brand, ram_total, ram_free, current_bandwidth_);
-  protocol::response_t resp;
-  common::Error err_ser = SystemInfoResponceSuccsess(req->id, info, &resp);
-  if (err_ser) {
-    const std::string err_str = err_ser->GetDescription();
-    return common::make_errno_error(err_str, EAGAIN);
-  }
-
-  return client->WriteResponce(resp);
+common::ErrnoError InnerTcpHandler::HandleRequestServerClientInfo(Client* client, protocol::request_t* req) {
+  return client->SystemInfo(req->id, auth_info_.GetLogin(), current_bandwidth_);
 }
 
-common::ErrnoError InnerTcpHandler::HandleInnerDataReceived(InnerSTBClient* client, const std::string& input_command) {
+common::ErrnoError InnerTcpHandler::HandleInnerDataReceived(Client* client, const std::string& input_command) {
   protocol::request_t* req = nullptr;
   protocol::response_t* resp = nullptr;
   common::Error err_parse = common::protocols::json_rpc::ParseJsonRPC(input_command, &req, &resp);
@@ -431,8 +345,8 @@ common::ErrnoError InnerTcpHandler::HandleInnerDataReceived(InnerSTBClient* clie
   return common::ErrnoError();
 }
 
-common::ErrnoError InnerTcpHandler::HandleRequestCommand(InnerSTBClient* client, protocol::request_t* req) {
-  InnerSTBClient* sclient = static_cast<InnerSTBClient*>(client);
+common::ErrnoError InnerTcpHandler::HandleRequestCommand(Client* client, protocol::request_t* req) {
+  Client* sclient = static_cast<Client*>(client);
   if (req->method == SERVER_PING) {
     return HandleRequestServerPing(sclient, req);
   } else if (req->method == SERVER_GET_CLIENT_INFO) {
@@ -443,7 +357,7 @@ common::ErrnoError InnerTcpHandler::HandleRequestCommand(InnerSTBClient* client,
   return common::ErrnoError();
 }
 
-common::ErrnoError InnerTcpHandler::HandleResponceClientActivate(InnerSTBClient* client, protocol::response_t* resp) {
+common::ErrnoError InnerTcpHandler::HandleResponceClientActivate(Client* client, protocol::response_t* resp) {
   if (resp->IsMessage()) {
     client->SetName(auth_info_.GetLogin());
     fApp->PostEvent(new events::ClientAuthorizedEvent(this, auth_info_));
@@ -456,7 +370,7 @@ common::ErrnoError InnerTcpHandler::HandleResponceClientActivate(InnerSTBClient*
   return common::ErrnoError();
 }
 
-common::ErrnoError InnerTcpHandler::HandleResponceClientPing(InnerSTBClient* client, protocol::response_t* resp) {
+common::ErrnoError InnerTcpHandler::HandleResponceClientPing(Client* client, protocol::response_t* resp) {
   UNUSED(client);
   if (resp->IsMessage()) {
     const char* params_ptr = resp->message->result.c_str();
@@ -477,8 +391,7 @@ common::ErrnoError InnerTcpHandler::HandleResponceClientPing(InnerSTBClient* cli
   return common::ErrnoError();
 }
 
-common::ErrnoError InnerTcpHandler::HandleResponceClientGetServerInfo(InnerSTBClient* client,
-                                                                      protocol::response_t* resp) {
+common::ErrnoError InnerTcpHandler::HandleResponceClientGetServerInfo(Client* client, protocol::response_t* resp) {
   if (resp->IsMessage()) {
     const char* params_ptr = resp->message->result.c_str();
     json_object* jserver_info = json_tokener_parse(params_ptr);
@@ -497,10 +410,9 @@ common::ErrnoError InnerTcpHandler::HandleResponceClientGetServerInfo(InnerSTBCl
     common::net::HostAndPort host = sinf.GetBandwidthHost();
     bandwidth::TcpBandwidthClient* band_connection = nullptr;
     common::libev::IoLoop* server = client->GetServer();
-    const BandwidthHostType hs = MAIN_SERVER;
-    common::ErrnoError errn = CreateAndConnectTcpBandwidthClient(server, host, hs, &band_connection);
+    common::ErrnoError errn = CreateAndConnectTcpBandwidthClient(server, host, &band_connection);
     if (errn) {
-      events::BandwidtInfo cinf(host, 0, hs);
+      events::BandwidtInfo cinf(host, 0);
       current_bandwidth_ = 0;
       auto ex_event = common::make_exception_event(new events::BandwidthEstimationEvent(this, cinf),
                                                    common::make_error_from_errno(errn));
@@ -515,8 +427,7 @@ common::ErrnoError InnerTcpHandler::HandleResponceClientGetServerInfo(InnerSTBCl
   return common::ErrnoError();
 }
 
-common::ErrnoError InnerTcpHandler::HandleResponceClientGetChannels(InnerSTBClient* client,
-                                                                    protocol::response_t* resp) {
+common::ErrnoError InnerTcpHandler::HandleResponceClientGetChannels(Client* client, protocol::response_t* resp) {
   UNUSED(client);
   if (resp->IsMessage()) {
     const char* params_ptr = resp->message->result.c_str();
@@ -539,7 +450,7 @@ common::ErrnoError InnerTcpHandler::HandleResponceClientGetChannels(InnerSTBClie
   return common::ErrnoError();
 }
 
-common::ErrnoError InnerTcpHandler::HandleResponceClientGetruntimeChannelInfo(InnerSTBClient* client,
+common::ErrnoError InnerTcpHandler::HandleResponceClientGetruntimeChannelInfo(Client* client,
                                                                               protocol::response_t* resp) {
   UNUSED(client);
   if (resp->IsMessage()) {
@@ -563,9 +474,9 @@ common::ErrnoError InnerTcpHandler::HandleResponceClientGetruntimeChannelInfo(In
   return common::ErrnoError();
 }
 
-common::ErrnoError InnerTcpHandler::HandleResponceCommand(InnerSTBClient* client, protocol::response_t* resp) {
+common::ErrnoError InnerTcpHandler::HandleResponceCommand(Client* client, protocol::response_t* resp) {
   protocol::request_t req;
-  InnerSTBClient* sclient = static_cast<InnerSTBClient*>(client);
+  Client* sclient = static_cast<Client*>(client);
   if (sclient->PopRequestByID(resp->id, &req)) {
     if (req.method == CLIENT_ACTIVATE) {
       return HandleResponceClientActivate(sclient, resp);

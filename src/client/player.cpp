@@ -352,9 +352,7 @@ void Player::SwitchToDisconnectModeCheckConfig() {
 
 void Player::HandleBandwidthEstimationEvent(events::BandwidthEstimationEvent* event) {
   events::BandwidtInfo band_inf = event->GetInfo();
-  if (band_inf.host_type == MAIN_SERVER) {
-    controller_->RequestChannels();
-  }
+  controller_->RequestChannels();
 }
 
 void Player::HandleClientConnectedEvent(events::ClientConnectedEvent* event) {

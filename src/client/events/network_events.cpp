@@ -22,8 +22,7 @@ namespace fastotv {
 namespace client {
 namespace events {
 
-BandwidtInfo::BandwidtInfo(const common::net::HostAndPort& host, bandwidth_t band, BandwidthHostType hs)
-    : host(host), bandwidth(band), host_type(hs) {}
+BandwidtInfo::BandwidtInfo(const common::net::HostAndPort& host, bandwidth_t band) : host(host), bandwidth(band) {}
 
 ConnectInfo::ConnectInfo() {}
 

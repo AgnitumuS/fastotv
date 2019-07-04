@@ -33,7 +33,6 @@
 #include "inih/ini.h"  // for ini_parse
 
 #include "client/cmdutils.h"
-#include "client/types.h"  // for Size
 
 #define CONFIG_USER_OPTIONS "user_options"
 #define CONFIG_USER_OPTIONS_LOGIN_FIELD "login"
@@ -183,7 +182,7 @@ int ini_handler_fasto(void* user, const char* section, const char* name, const c
   } else if (MATCH(CONFIG_PLAYER_OPTIONS, CONFIG_PLAYER_OPTIONS_VOLUME_FIELD)) {
     int volume;
     if (parse_number(value, 0, 100, &volume)) {
-      pconfig->player_options.audio_volume = volume;
+      pconfig->player_options.audio_volume = static_cast<int8_t>(volume);
     }
     return 1;
   } else if (MATCH(CONFIG_PLAYER_OPTIONS, CONFIG_PLAYER_OPTIONS_LAST_SHOWED_CHANNEL_ID_FIELD)) {

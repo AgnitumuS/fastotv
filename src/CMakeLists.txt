@@ -369,8 +369,6 @@ SET(SOURCES_INNER_CLIENT
 )
 
 SET(TV_PLAYER_SOURCES
-  ${CLIENT_SOURCE_DIR}/types.h
-  ${CLIENT_SOURCE_DIR}/types.cpp
   ${CLIENT_SOURCE_DIR}/playlist_entry.h
   ${CLIENT_SOURCE_DIR}/playlist_entry.cpp
   ${CLIENT_SOURCE_DIR}/ioservice.h

@@ -36,15 +36,8 @@ namespace fastotv {
 namespace client {
 namespace bandwidth {
 
-TcpBandwidthClient::TcpBandwidthClient(common::libev::IoLoop* server,
-                                       const common::net::socket_info& info,
-                                       BandwidthHostType hs)
-    : base_class(server, info),
-      duration_(0),
-      total_downloaded_bytes_(0),
-      start_ts_(0),
-      downloaded_bytes_per_sec_(0),
-      host_type_(hs) {}
+TcpBandwidthClient::TcpBandwidthClient(common::libev::IoLoop* server, const common::net::socket_info& info)
+    : base_class(server, info), duration_(0), total_downloaded_bytes_(0), start_ts_(0), downloaded_bytes_per_sec_(0) {}
 
 const char* TcpBandwidthClient::ClassName() const {
   return "TcpBandwidthClient";
@@ -71,10 +64,6 @@ size_t TcpBandwidthClient::GetTotalDownloadedBytes() const {
 
 bandwidth_t TcpBandwidthClient::GetDownloadBytesPerSecond() const {
   return downloaded_bytes_per_sec_;
-}
-
-BandwidthHostType TcpBandwidthClient::GetHostType() const {
-  return host_type_;
 }
 
 common::ErrnoError TcpBandwidthClient::SingleRead(void* out, size_t size, size_t* nread) {

@@ -25,22 +25,18 @@
 #include <common/net/types.h>               // for HostAndPort
 
 #include <fastotv/commands_info/auth_info.h>  // for AuthInfo
-#include <fastotv/types.h>                    // for bandwidth_t
-
-#include "client/types.h"  // for BandwidthHostType
-
 #include <fastotv/protocol/types.h>
+#include <fastotv/types.h>  // for bandwidth_t
 
 namespace fastotv {
 namespace client {
+class Client;
 namespace bandwidth {
 class TcpBandwidthClient;
 }
 namespace inner {
 
 class InnerTcpHandler : public common::libev::IoLoopObserver {
-  class InnerSTBClient;
-
  public:
   enum {
     ping_timeout_server = 30  // sec
@@ -71,28 +67,25 @@ class InnerTcpHandler : public common::libev::IoLoopObserver {
 #endif
 
  protected:
-  common::ErrnoError HandleInnerDataReceived(InnerSTBClient* client, const std::string& input_command);
-  common::ErrnoError HandleRequestCommand(InnerSTBClient* client, protocol::request_t* req);
-  common::ErrnoError HandleResponceCommand(InnerSTBClient* client, protocol::response_t* resp);
+  common::ErrnoError HandleInnerDataReceived(Client* client, const std::string& input_command);
+  common::ErrnoError HandleRequestCommand(Client* client, protocol::request_t* req);
+  common::ErrnoError HandleResponceCommand(Client* client, protocol::response_t* resp);
 
  private:
-  protocol::sequance_id_t NextRequestID();
+  common::ErrnoError HandleRequestServerPing(Client* client, protocol::request_t* req);
+  common::ErrnoError HandleRequestServerClientInfo(Client* client, protocol::request_t* req);
 
-  common::ErrnoError HandleRequestServerPing(InnerSTBClient* client, protocol::request_t* req);
-  common::ErrnoError HandleRequestServerClientInfo(InnerSTBClient* client, protocol::request_t* req);
-
-  common::ErrnoError HandleResponceClientActivate(InnerSTBClient* client, protocol::response_t* resp);
-  common::ErrnoError HandleResponceClientPing(InnerSTBClient* client, protocol::response_t* resp);
-  common::ErrnoError HandleResponceClientGetServerInfo(InnerSTBClient* client, protocol::response_t* resp);
-  common::ErrnoError HandleResponceClientGetChannels(InnerSTBClient* client, protocol::response_t* resp);
-  common::ErrnoError HandleResponceClientGetruntimeChannelInfo(InnerSTBClient* client, protocol::response_t* resp);
+  common::ErrnoError HandleResponceClientActivate(Client* client, protocol::response_t* resp);
+  common::ErrnoError HandleResponceClientPing(Client* client, protocol::response_t* resp);
+  common::ErrnoError HandleResponceClientGetServerInfo(Client* client, protocol::response_t* resp);
+  common::ErrnoError HandleResponceClientGetChannels(Client* client, protocol::response_t* resp);
+  common::ErrnoError HandleResponceClientGetruntimeChannelInfo(Client* client, protocol::response_t* resp);
 
   common::ErrnoError CreateAndConnectTcpBandwidthClient(common::libev::IoLoop* server,
                                                         const common::net::HostAndPort& host,
-                                                        BandwidthHostType hs,
                                                         bandwidth::TcpBandwidthClient** out_band) WARN_UNUSED_RESULT;
 
-  InnerSTBClient* inner_connection_;
+  Client* inner_connection_;
   std::vector<bandwidth::TcpBandwidthClient*> bandwidth_requests_;
   common::libev::timer_id_t ping_server_id_timer_;
 
@@ -100,7 +93,6 @@ class InnerTcpHandler : public common::libev::IoLoopObserver {
   const commands_info::AuthInfo auth_info_;
 
   bandwidth_t current_bandwidth_;
-  std::atomic<protocol::seq_id_t> id_;
 };
 
 }  // namespace inner

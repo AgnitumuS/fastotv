@@ -26,8 +26,6 @@
 #include <fastotv/commands_info/channels_info.h>
 #include <fastotv/commands_info/runtime_channel_info.h>
 
-#include "client/types.h"  // for BandwidthHostType
-
 #define CLIENT_DISCONNECT_EVENT static_cast<EventsType>(USER_EVENTS + 1)
 #define CLIENT_CONNECT_EVENT static_cast<EventsType>(USER_EVENTS + 2)
 #define CLIENT_AUTHORIZED_EVENT static_cast<EventsType>(USER_EVENTS + 3)
@@ -46,11 +44,10 @@ namespace events {
 class TvConfig {};
 
 struct BandwidtInfo {
-  BandwidtInfo(const common::net::HostAndPort& host, bandwidth_t band, BandwidthHostType hs);
+  BandwidtInfo(const common::net::HostAndPort& host, bandwidth_t band);
 
   common::net::HostAndPort host;
   bandwidth_t bandwidth;
-  BandwidthHostType host_type;
 };
 
 struct ConnectInfo {

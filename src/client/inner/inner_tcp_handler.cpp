@@ -40,14 +40,12 @@ namespace inner {
 InnerTcpHandler::InnerTcpHandler(const common::net::HostAndPort& server_host, const commands_info::AuthInfo& auth_info)
     : common::libev::IoLoopObserver(),
       inner_connection_(nullptr),
-      band_connection_(nullptr),
       ping_server_id_timer_(INVALID_TIMER_ID),
       server_host_(server_host),
       auth_info_(auth_info),
       current_bandwidth_(0) {}
 
 InnerTcpHandler::~InnerTcpHandler() {
-  CHECK(!band_connection_);
   CHECK(!inner_connection_);
 }
 
@@ -78,17 +76,13 @@ void InnerTcpHandler::Closed(common::libev::IoClient* client) {
   }
 
   // bandwidth
-  if (client == band_connection_) {
-    bandwidth::TcpBandwidthClient* band_client = static_cast<bandwidth::TcpBandwidthClient*>(client);
-    common::net::socket_info info = band_client->GetInfo();
-    const common::net::HostAndPort host(info.host(), info.port());
-    current_bandwidth_ = band_client->GetDownloadBytesPerSecond();
-    events::BandwidtInfo cinf(host, current_bandwidth_);
-    events::BandwidthEstimationEvent* band_event = new events::BandwidthEstimationEvent(this, cinf);
-    fApp->PostEvent(band_event);
-    band_connection_ = nullptr;
-    return;
-  }
+  bandwidth::TcpBandwidthClient* band_client = static_cast<bandwidth::TcpBandwidthClient*>(client);
+  common::net::socket_info info = band_client->GetInfo();
+  const common::net::HostAndPort host(info.host(), info.port());
+  current_bandwidth_ = band_client->GetDownloadBytesPerSecond();
+  events::BandwidtInfo cinf(host, current_bandwidth_);
+  events::BandwidthEstimationEvent* band_event = new events::BandwidthEstimationEvent(this, cinf);
+  fApp->PostEvent(band_event);
 }
 
 void InnerTcpHandler::DataReceived(common::libev::IoClient* client) {
@@ -133,7 +127,6 @@ void InnerTcpHandler::PostLooped(common::libev::IoLoop* server) {
     ping_server_id_timer_ = INVALID_TIMER_ID;
   }
 
-  CHECK(!band_connection_);
   CHECK(!inner_connection_);
 }
 
@@ -413,7 +406,6 @@ common::ErrnoError InnerTcpHandler::HandleResponceClientGetServerInfo(Client* cl
       return errn;
     }
 
-    band_connection_ = band_connection;
     server->RegisterClient(band_connection);
     return common::ErrnoError();
   }

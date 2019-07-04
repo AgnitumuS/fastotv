@@ -86,7 +86,6 @@ class InnerTcpHandler : public common::libev::IoLoopObserver {
                                                         bandwidth::TcpBandwidthClient** out_band) WARN_UNUSED_RESULT;
 
   Client* inner_connection_;
-  bandwidth::TcpBandwidthClient* band_connection_;
   common::libev::timer_id_t ping_server_id_timer_;
 
   const common::net::HostAndPort server_host_;

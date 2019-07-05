@@ -1,11 +1,11 @@
-1.5.3 /
+1.5.3 / July 5, 2019
 [Alexandr Topilski]
 - Protocol update
 
 1.5.2 / June 21, 2019
 [Alexandr Topilski]
 - Stabilization
-- Rasspbery PI
+- Raspberry PI
 - Realtime login password
 - Branding
 - Gzip compress

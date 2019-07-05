@@ -161,7 +161,7 @@ class BuildRequest(object):
         saver.update_progress_message_range(80.0, 84.0, 'Trying to get package file name')
         in_file = open('CPackConfig.cmake', 'r')
         for line in in_file.readlines():
-            res = re.search(r'set\(CPACK_PACKAGE_FILE_NAME "(.+)"\)', line)
+            res = re.search(r'SET\(CPACK_PACKAGE_FILE_NAME "(.+)"\)', line)
             if res:
                 filename = res.group(1)
                 break
@@ -174,9 +174,8 @@ class BuildRequest(object):
             try:
                 common_policy = run_command.CommonPolicy(store)
                 run_command.run_command_cb(make_cpack, common_policy)
-                if file_name:
-                    file_names.append(
-                        os.path.join(abs_dir_path, filename + '.' + system_info.get_extension_by_package(generator)))
+                file_names.append(
+                    os.path.join(abs_dir_path, filename + '.' + system_info.get_extension_by_package(generator)))
             except Exception as ex:
                 os.chdir(pwd)
                 raise ex

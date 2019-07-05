@@ -174,8 +174,9 @@ class BuildRequest(object):
             try:
                 common_policy = run_command.CommonPolicy(store)
                 run_command.run_command_cb(make_cpack, common_policy)
-                file_names.append(
-                    os.path.join(abs_dir_path, filename + '.' + system_info.get_extension_by_package(generator)))
+                if file_name:
+                    file_names.append(
+                        os.path.join(abs_dir_path, filename + '.' + system_info.get_extension_by_package(generator)))
             except Exception as ex:
                 os.chdir(pwd)
                 raise ex

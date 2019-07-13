@@ -6,6 +6,8 @@ import subprocess
 
 from pyfastogt import utils
 
+LIRC_FOLDER = '/etc/lirc/'
+
 
 def install_orange_pi_h3():
     subprocess.call(['modprobe', 'mali'])
@@ -51,11 +53,12 @@ def install_orange_pi_h3():
         shutil.move(standart_egl_path, '/usr/lib/arm-linux-gnueabihf/.mesa-egl/')
 
     lirc_conf_path = os.path.join(script_dir, 'hardware/lirc/hardware.conf')
-    shutil.copy(lirc_conf_path, '/etc/lirc/hardware.conf')
+    if os.path.exists(LIRC_FOLDER):
+        dst = os.path.join(LIRC_FOLDER, 'hardware.conf')
+        shutil.copy(lirc_conf_path, dst)
 
 
 def install_orange_pi_h5():
-    pwd = os.getcwd()
     script_dir = os.path.dirname(os.path.realpath(__file__))
 
     with open('/etc/asound.conf', 'w') as f:
@@ -69,5 +72,6 @@ def install_orange_pi_h5():
                 '}')
 
     lirc_conf_path = os.path.join(script_dir, 'hardware/lirc/hardware.conf')
-    if os.path.exists('/etc/lirc/'):
-        shutil.copy(lirc_conf_path, '/etc/lirc/hardware.conf')
+    if os.path.exists(LIRC_FOLDER):
+        dst = os.path.join(LIRC_FOLDER, 'hardware.conf')
+        shutil.copy(lirc_conf_path, dst)

@@ -69,4 +69,5 @@ def install_orange_pi_h5():
                 '}')
 
     lirc_conf_path = os.path.join(script_dir, 'hardware/lirc/hardware.conf')
-    shutil.copy(lirc_conf_path, '/etc/lirc/hardware.conf')
+    if os.path.exists('/etc/lirc/'):
+        shutil.copy(lirc_conf_path, '/etc/lirc/hardware.conf')
